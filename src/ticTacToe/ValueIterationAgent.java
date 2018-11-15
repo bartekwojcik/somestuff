@@ -1,9 +1,6 @@
 package ticTacToe;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A Value Iteration Agent, only very partially implemented. The methods to implement are: 
@@ -89,7 +86,26 @@ public class ValueIterationAgent extends Agent {
 		this.discount=discountFactor;
 		m=new TTTMDP(winReward, loseReward, livingReward, drawReward);
 	}
-	
+
+
+//	public Map.Entry<Move, Double> getMaxEntry(Map<Move, Double> map){
+//		try {
+//			Map.Entry<Move, Double> maxEntry = null;
+//			Double max = Collections.max(map.values());
+//
+//			for (Map.Entry<Move, Double> entry : map.entrySet()) {
+//				Double value = entry.getValue();
+//				if (null != value && max == value) {
+//					maxEntry = entry;
+//				}
+//			}
+//			return maxEntry;
+//		}
+//		catch (Exception ex)
+//		{
+//			return null;
+//		}
+//	}
 	/**
 	 
 	
@@ -101,11 +117,31 @@ public class ValueIterationAgent extends Agent {
 	 */
 	public void iterate()
 	{
-        for (int i = 0; i < k; i++)
-        {
-
-        }
-		
+		for (int i=0; i < k;i++)
+		{
+			for (Map.Entry<Game, Double> pair: this.valueFunction.entrySet()) {
+				Game game = pair.getKey();
+				Double value = pair.getValue();
+				//pair.setValue(value+1);
+				Map<Move, Double> moveRankingMap = new HashMap<Move, Double>();
+				for (Move possibleMove : game.getPossibleMoves())
+				{
+					double summation = 0D;
+					for ( TransitionProb transitionProb : this.m.generateTransitions(game, possibleMove)){
+						double prob = transitionProb.prob;
+						double localReward = transitionProb.outcome.localReward;
+						double gamma = this.discount;
+						double valuePrim = valueFunction.get(transitionProb.outcome.sPrime);
+						summation += prob * (localReward + gamma*valuePrim);
+					}
+					moveRankingMap.put(possibleMove,summation);
+				}
+				if(!moveRankingMap.isEmpty()) {
+					Map.Entry<Move, Double> bestPair = Collections.max(moveRankingMap.entrySet(), Map.Entry.comparingByValue());
+					this.valueFunction.put(game, bestPair.getValue());
+				}
+			}
+		}
 	}
 	
 	/**This method should be run AFTER the train method to extract a policy according to {@link ValueIterationAgent#valueFunction}
@@ -116,16 +152,44 @@ public class ValueIterationAgent extends Agent {
 	 */
 	public Policy extractPolicy()
 	{
-		/* YOUR CODE HERE */
-		return null;
+		Policy policy = new Policy();
+		policy.policy = new HashMap<Game, Move>();
+
+		for (Map.Entry<Game, Double> pair: this.valueFunction.entrySet()) {
+			Game game = pair.getKey();
+			Double value = pair.getValue();
+			//pair.setValue(value+1);
+			Map<Move, Double> moveRankingMap = new HashMap<Move, Double>();
+			for (Move possibleMove : game.getPossibleMoves())
+			{
+				double summation = 0D;
+				for ( TransitionProb transitionProb : this.m.generateTransitions(game, possibleMove)){
+					double prob = transitionProb.prob;
+					double localReward = transitionProb.outcome.localReward;
+					double gamma = this.discount;
+					double valuePrim = valueFunction.get(transitionProb.outcome.sPrime);
+					summation += prob * (localReward + gamma*valuePrim);
+				}
+				moveRankingMap.put(possibleMove,summation);
+			}
+			if (!moveRankingMap.isEmpty()) {
+				Map.Entry<Move, Double> bestPair = Collections.max(moveRankingMap.entrySet(), Map.Entry.comparingByValue());
+				policy.policy.put(game, bestPair.getKey());
+			}
+		}
+		return policy;
 	}
-	
+
+
 	/**
 	 * This method solves the mdp using your implementation of {@link ValueIterationAgent#extractPolicy} and
 	 * {@link ValueIterationAgent#iterate}. 
 	 */
 	public void train()
 	{
+
+		this.initValues();
+
 		/**
 		 * First run value iteration
 		 */
