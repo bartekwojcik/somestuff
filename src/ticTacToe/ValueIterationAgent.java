@@ -153,7 +153,6 @@ public class ValueIterationAgent extends Agent {
 	public Policy extractPolicy()
 	{
 		Policy policy = new Policy();
-		policy.policy = new HashMap<Game, Move>();
 
 		for (Map.Entry<Game, Double> pair: this.valueFunction.entrySet()) {
 			Game game = pair.getKey();

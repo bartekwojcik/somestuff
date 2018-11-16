@@ -1,7 +1,10 @@
 package ticTacToe;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 /**
  * A policy iteration agent. You should implement the following methods:
  * (1) {@link PolicyIterationAgent#evaluatePolicy}: this is the policy evaluation step from your lectures
@@ -101,7 +104,18 @@ public class PolicyIterationAgent extends Agent {
 	 */
 	public void initRandomPolicy()
 	{
-		/* YOUR CODE HERE */
+		for (Map.Entry<Game, Double> pair: this.policyValues.entrySet())
+		{
+			Game game = pair.getKey();
+			Double value = pair.getValue();
+
+			List<Move> possibleMoves = game.getPossibleMoves();
+			if (!possibleMoves.isEmpty())
+			{
+				Move firstMove = possibleMoves.get(0);
+				this.curPolicy.put(game,firstMove);
+			}
+		}
 	}
 	
 	
@@ -115,7 +129,54 @@ public class PolicyIterationAgent extends Agent {
 	 */
 	protected void evaluatePolicy(double delta)
 	{
-		/* YOUR CODE HERE */
+		int maxIter = 200;
+
+		for (int i =0; i<maxIter;i++)
+		{
+			//break on some value change
+			HashMap<Game,Double> changeValuesMap = new HashMap<Game,Double>();
+			for (Map.Entry<Game, Double> pair: this.policyValues.entrySet())
+			{
+				Game game = pair.getKey();
+				Double value = pair.getValue();
+
+				//apply rewards
+				switch (game.state)
+				{
+					case Game.DRAW:
+						this.policyValues.put(game, this.mdp.winReward);
+						continue;
+					case Game.O_WON:
+						this.policyValues.put(game,this.mdp.loseReward);
+						continue;
+					case Game.X_WON:
+						this.policyValues.put(game,this.mdp.drawReward);
+						continue;
+				}
+				Move moveUnderCurrentPolicy = this.curPolicy.get(game);
+
+				double currentValue = 0D;
+				for(TransitionProb transitionProb: mdp.generateTransitions(game,moveUnderCurrentPolicy)){
+					double prob = transitionProb.prob;
+					double localReward = transitionProb.outcome.localReward;
+					double gamma = this.discount;
+					double valuePrim = policyValues.get(transitionProb.outcome.sPrime);
+					currentValue += prob * (localReward + gamma*valuePrim);
+				}
+				double previousValue = this.policyValues.get(game);
+				this.policyValues.put(game,currentValue);
+				double difference = Math.abs(previousValue - currentValue);
+				changeValuesMap.put(game,difference);
+
+			}
+			if (!changeValuesMap.isEmpty()) {
+				double maxChange = Collections.max(changeValuesMap.entrySet(), Map.Entry.comparingByValue()).getValue();
+				if ( maxChange<delta)
+				{
+					break;
+				}
+			}
+		}
 		
 	}
 	
@@ -127,8 +188,28 @@ public class PolicyIterationAgent extends Agent {
 	 */
 	protected void improvePolicy()
 	{
-		/* YOUR CODE HERE */
-		
+
+		for (Map.Entry<Game, Double> pair: this.policyValues.entrySet()) {
+			Game game = pair.getKey();
+
+			Map<Move, Double> moveRankingMap = new HashMap<Move, Double>();
+			for (Move possibleMove : game.getPossibleMoves())
+			{
+				double summation = 0D;
+				for ( TransitionProb transitionProb : this.mdp.generateTransitions(game, possibleMove)){
+					double prob = transitionProb.prob;
+					double localReward = transitionProb.outcome.localReward;
+					double gamma = this.discount;
+					double valuePrim = policyValues.get(transitionProb.outcome.sPrime);
+					summation += prob * (localReward + gamma*valuePrim);
+				}
+				moveRankingMap.put(possibleMove,summation);
+			}
+			if (!moveRankingMap.isEmpty()) {
+				Map.Entry<Move, Double> bestPair = Collections.max(moveRankingMap.entrySet(), Map.Entry.comparingByValue());
+				this.curPolicy.put(game, bestPair.getKey());
+			}
+		}
 	}
 	
 	/**
@@ -138,13 +219,23 @@ public class PolicyIterationAgent extends Agent {
 	 */
 	public void train()
 	{
-		/* YOUR CODE HERE */
-		
-		if (this.policy==null)
+		this.initValues();
+		initRandomPolicy();
+		int maxIter = 200;
+		for (int i = 0; i < maxIter; i++)
 		{
-			System.out.println("Unimplemented methods! First implement the evaluatePolicy(), improvePolicy() & train() methods");
-			System.exit(1);
+			this.evaluatePolicy(0.01);
+			HashMap<Game, Move>  oldPolicy = new HashMap<Game, Move>(this.curPolicy);
+			improvePolicy();
+			if (curPolicy.equals(oldPolicy))
+			{
+				System.out.println("Policy converged at iteration: " + i);
+				break;
+			}
 		}
+
+		this.policy = new Policy();
+		this.policy.policy = this.curPolicy;
 		
 	}
 	
